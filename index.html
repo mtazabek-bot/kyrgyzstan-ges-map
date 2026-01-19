@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивная карта Кыргызстана</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --accent: #fbbf24;
+            --glass-bg: rgba(17, 24, 39, 0.92);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            --text-dark: #f1f5f9;
+            --text-light: #94a3b8;
+            --bg-dark: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.9);
+        }
+
+        body {
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Logo Watermark */
+        .logo-watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 500;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+
+        .logo-watermark svg {
+            width: 200px;
+            height: 200px;
+            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 15px 30px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header h1 {
+            font-size: 1.3rem;
+            color: var(--text-dark);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .header-icon {
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        /* Search Box */
+        .search-container {
+            position: fixed;
+            top: 90px;
+            left: 20px;
+            z-index: 1000;
+            width: 350px;
+        }
+
+        .search-box {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 12px 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .search-box input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 1rem;
+            color: var(--text-dark);
+            outline: none;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-light);
+        }
+
+        .search-box i {
+            color: var(--text-light);
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .search-box i:hover {
+            color: var(--primary);
+        }
+
+        .search-results {
+            margin-top: 10px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .search-result-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .search-result-item:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-item h4 {
+            color: var(--text-dark);
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .search-result-item p {
+            color: var(--text-light);
+            font-size: 0.8rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            z-index: 1000;
+            width: 320px;
+            max-height: calc(100vh - 120px);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(calc(100% + 20px));
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-header h3 {
+            color: var(--text-dark);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-header h3 i {
+            color: var(--primary);
+        }
+
+        .marker-count {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .markers-list {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .marker-item {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid var(--glass-border);
+        }
+
+        .marker-item:hover {
+            transform: translateX(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
+        }
+
+        .marker-item h4 {
+            color: var(--text-dark);
+            font-size: 0.95rem;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .marker-item h4 i {
+            color: var(--accent);
+        }
+
+        .marker-item p {
+            color: var(--text-light);
+            font-size: 0.85rem;
+        }
+
+        .marker-item-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .marker-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .marker-btn.edit {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--primary);
+        }
+
+        .marker-btn.edit:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .marker-btn.delete {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .marker-btn.delete:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .marker-btn.goto {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .marker-btn.goto:hover {
+            background: #10b981;
+            color: white;
+        }
+
+        .no-markers {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+
+        .no-markers i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+
+        /* Toggle Sidebar Button */
+        .toggle-sidebar {
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            z-index: 999;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--text-dark);
+            transition: all 0.3s;
+        }
+
+        .toggle-sidebar:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .sidebar.collapsed+.toggle-sidebar {
+            display: flex;
+        }
+
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--text-dark);
+            transition: all 0.3s;
+        }
+
+        .control-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .control-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Layer Switcher */
+        .layer-switcher {
+            position: fixed;
+            bottom: 30px;
+            right: 20px;
+            z-index: 1000;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            padding: 15px;
+            display: none;
+        }
+
+        .layer-switcher.active {
+            display: block;
+        }
+
+        .layer-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background 0.3s;
+            color: var(--text-dark);
+        }
+
+        .layer-option:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        .layer-option.selected {
+            background: rgba(59, 130, 246, 0.25);
+        }
+
+        .layer-preview {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            background-size: cover;
+            border: 2px solid transparent;
+        }
+
+        .layer-option.selected .layer-preview {
+            border-color: var(--primary);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 30px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--glass-border);
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal h3 {
+            color: var(--text-dark);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal h3 i {
+            color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--text-dark);
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+            font-family: inherit;
+            background: #0f172a;
+            color: var(--text-dark);
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-group select option {
+            background: #1e293b;
+            color: var(--text-dark);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: var(--text-dark);
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        /* Custom Marker Styles */
+        .custom-marker {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+            border: 3px solid white;
+        }
+
+        .custom-marker i {
+            transform: rotate(45deg);
+            color: white;
+            font-size: 1rem;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+        }
+
+        .toast {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 15px 25px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            animation: toastIn 0.3s ease;
+            color: var(--text-dark);
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .toast.success i {
+            color: #10b981;
+        }
+
+        .toast.error i {
+            color: #ef4444;
+        }
+
+        .toast.info i {
+            color: var(--primary);
+        }
+
+        /* Instructions */
+        .instructions {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            padding: 12px 25px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: var(--text-dark);
+        }
+
+        .instructions i {
+            color: var(--accent);
+        }
+
+        /* Leaflet Popup Styles - Dark Theme */
+        .leaflet-popup-content-wrapper {
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            background: #1e293b;
+            color: var(--text-dark);
+        }
+
+        .leaflet-popup-tip {
+            background: #1e293b;
+        }
+
+        .leaflet-popup-content {
+            margin: 15px 20px;
+        }
+
+        .popup-content h4 {
+            color: var(--text-dark);
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+
+        .popup-content p {
+            color: var(--text-light);
+            margin-bottom: 10px;
+        }
+
+        .popup-content .coords {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            background: #334155;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin-top: 8px;
+        }
+
+        /* Dark Leaflet Controls */
+        .leaflet-control-zoom a {
+            background: var(--glass-bg) !important;
+            color: var(--text-dark) !important;
+            border-color: var(--glass-border) !important;
+        }
+
+        .leaflet-control-zoom a:hover {
+            background: var(--primary) !important;
+            color: white !important;
+        }
+
+        .leaflet-control-attribution {
+            background: var(--glass-bg) !important;
+            color: var(--text-light) !important;
+        }
+
+        .leaflet-control-attribution a {
+            color: var(--primary) !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                width: calc(100% - 40px);
+                padding: 12px 20px;
+            }
+
+            .header h1 {
+                font-size: 1rem;
+            }
+
+            .search-container {
+                width: calc(100% - 40px);
+                left: 20px;
+            }
+
+            .sidebar {
+                width: 100%;
+                right: 0;
+                top: auto;
+                bottom: 0;
+                max-height: 50vh;
+                border-radius: 20px 20px 0 0;
+            }
+
+            .sidebar.collapsed {
+                transform: translateY(100%);
+            }
+
+            .instructions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Logo Watermark -->
+    <div class="logo-watermark">
+        <svg width="200" height="200" viewBox="0 0 2035 2035" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd"
+                d="M879.304 841.923C879.304 1105.95 880.779 1518 880.779 1518H1031.22V841.923C1051.95 794.821 1094.75 744.086 1169.86 740.883C1243.39 739.084 1294.67 786.716 1316.21 841.923H1456C1435.86 777.317 1418.35 743.143 1345.38 693.334C1240.29 630.774 1180.06 625.236 1071.04 653.215L956 518L842.431 653.215C728.868 623.634 668.615 633.529 566.619 693.334C493.948 745.229 474.285 778.975 456 841.923H594.643C633.403 741.284 733.286 740.883 733.286 740.883C733.286 740.883 742.442 740.204 749.51 740.93C778.413 741.119 854.51 765.567 879.304 841.923Z"
+                fill="white" />
+        </svg>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <i class="fas fa-mountain header-icon"></i>
+        <h1>Интерактивная карта Кыргызстана</h1>
+    </div>
+
+    <!-- Search -->
+    <div class="search-container">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Поиск места...">
+            <i class="fas fa-times" id="clearSearch" style="display: none;"></i>
+        </div>
+        <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <!-- Map -->
+    <div id="map"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-map-marker-alt"></i> Мои метки</h3>
+            <span class="marker-count" id="markerCount">0</span>
+        </div>
+        <div class="markers-list" id="markersList">
+            <div class="no-markers">
+                <i class="fas fa-map-pin"></i>
+                <p>Нет сохранённых меток</p>
+                <p>Кликните на карту, чтобы добавить</p>
+            </div>
+        </div>
+    </div>
+    <button class="toggle-sidebar" id="toggleSidebar">
+        <i class="fas fa-list"></i>
+    </button>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="control-btn" id="addMarkerMode" title="Режим добавления меток">
+            <i class="fas fa-plus"></i>
+        </button>
+        <button class="control-btn" id="locateBtn" title="Моё местоположение">
+            <i class="fas fa-crosshairs"></i>
+        </button>
+        <button class="control-btn" id="layersBtn" title="Слои карты">
+            <i class="fas fa-layer-group"></i>
+        </button>
+        <button class="control-btn" id="downloadBtn" title="Экспорт меток">
+            <i class="fas fa-download"></i>
+        </button>
+    </div>
+
+    <!-- Layer Switcher -->
+    <div class="layer-switcher" id="layerSwitcher">
+        <div class="layer-option" data-layer="dark">
+            <div class="layer-preview" style="background: linear-gradient(135deg, #1a1a2e, #16213e);"></div>
+            <span>Тёмная</span>
+        </div>
+        <div class="layer-option selected" data-layer="streets">
+            <div class="layer-preview" style="background: linear-gradient(135deg, #e8f4f8, #a8dadc);"></div>
+            <span>Стандарт</span>
+        </div>
+        <div class="layer-option" data-layer="satellite">
+            <div class="layer-preview" style="background: linear-gradient(135deg, #2d5016, #4a7c23);"></div>
+            <span>Спутник</span>
+        </div>
+        <div class="layer-option" data-layer="terrain">
+            <div class="layer-preview" style="background: linear-gradient(135deg, #d4a574, #8b6914);"></div>
+            <span>Рельеф</span>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions" id="instructions">
+        <i class="fas fa-lightbulb"></i>
+        <span>Нажмите <strong>+</strong> и кликните на карту, чтобы добавить метку</span>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h3><i class="fas fa-map-pin"></i> <span id="modalTitle">Добавить метку</span></h3>
+            <form id="markerForm">
+                <input type="hidden" id="markerId">
+                <input type="hidden" id="markerLat">
+                <input type="hidden" id="markerLng">
+                <div class="form-group">
+                    <label for="markerName">Название</label>
+                    <input type="text" id="markerName" placeholder="Введите название места" required>
+                </div>
+                <div class="form-group">
+                    <label for="markerDesc">Описание</label>
+                    <textarea id="markerDesc" placeholder="Добавьте описание (необязательно)"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="markerCategory">Категория</label>
+                    <select id="markerCategory">
+                        <option value="place">📍 Место</option>
+                        <option value="nature">🏔️ Природа</option>
+                        <option value="food">🍽️ Еда</option>
+                        <option value="hotel">🏨 Отель</option>
+                        <option value="attraction">⭐ Достопримечательность</option>
+                        <option value="transport">🚗 Транспорт</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">Отмена</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Kyrgyzstan bounds and center
+        const kyrgyzstanCenter = [41.2044, 74.7661];
+        const kyrgyzstanBounds = [[39.1728, 69.2500], [43.2383, 80.2833]];
+
+        // Initialize map
+        const map = L.map('map', {
+            center: kyrgyzstanCenter,
+            zoom: 7,
+            minZoom: 6,
+            maxBounds: [[38, 68], [44, 81]],
+            zoomControl: false
+        });
+
+        // Add zoom control to bottom right
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // Tile layers - including dark mode
+        const layers = {
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            }),
+            streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '&copy; Esri'
+            }),
+            terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenTopoMap'
+            })
+        };
+
+        // Add dark layer as default
+        layers.dark.addTo(map);
+        let currentLayer = 'dark';
+
+        // Load Kyrgyzstan border from external GeoJSON
+        fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+            .then(response => response.json())
+            .then(data => {
+                // Find Kyrgyzstan
+                const kyrgyzstan = data.features.find(f =>
+                    f.properties.ADMIN === 'Kyrgyzstan' ||
+                    f.properties.ISO_A3 === 'KGZ' ||
+                    f.properties.name === 'Kyrgyzstan'
+                );
+
+                if (kyrgyzstan) {
+                    // Create mask - world polygon with Kyrgyzstan cut out
+                    const worldPolygon = [
+                        [[-90, -180], [-90, 180], [90, 180], [90, -180], [-90, -180]]
+                    ];
+
+                    // Add Kyrgyzstan border outline
+                    L.geoJSON(kyrgyzstan, {
+                        style: {
+                            color: '#3b82f6',
+                            weight: 3,
+                            opacity: 0.8,
+                            fillColor: 'transparent',
+                            fillOpacity: 0
+                        }
+                    }).addTo(map);
+
+                    // Create inverted mask using SVG overlay approach
+                    const maskLayer = L.geoJSON(kyrgyzstan, {
+                        invert: true,
+                        style: {
+                            color: 'transparent',
+                            fillColor: '#0f172a',
+                            fillOpacity: 1
+                        },
+                        renderer: L.svg()
+                    });
+
+                    // Alternative: use canvas clip
+                    const coords = kyrgyzstan.geometry.coordinates;
+
+                    // Create world bounds
+                    const outer = [[90, -180], [90, 180], [-90, 180], [-90, -180]];
+
+                    // Get inner polygon(s) - Kyrgyzstan
+                    let innerPolygons = [];
+                    if (kyrgyzstan.geometry.type === 'Polygon') {
+                        innerPolygons = [coords[0].map(c => [c[1], c[0]])];
+                    } else if (kyrgyzstan.geometry.type === 'MultiPolygon') {
+                        innerPolygons = coords.map(poly => poly[0].map(c => [c[1], c[0]]));
+                    }
+
+                    // Create mask with hole
+                    innerPolygons.forEach(inner => {
+                        L.polygon([outer, inner], {
+                            color: 'transparent',
+                            fillColor: '#0f172a',
+                            fillOpacity: 1,
+                            interactive: false
+                        }).addTo(map);
+                    });
+
+                    console.log('Kyrgyzstan border loaded successfully');
+                } else {
+                    console.log('Kyrgyzstan not found in GeoJSON, trying alternative source');
+                    loadAlternativeBorder();
+                }
+            })
+            .catch(err => {
+                console.log('Error loading GeoJSON:', err);
+                loadAlternativeBorder();
+            });
+
+        // Alternative border loading
+        function loadAlternativeBorder() {
+            fetch('https://nominatim.openstreetmap.org/search?country=Kyrgyzstan&polygon_geojson=1&format=json')
+                .then(r => r.json())
+                .then(data => {
+                    if (data[0] && data[0].geojson) {
+                        const geojson = data[0].geojson;
+
+                        L.geoJSON(geojson, {
+                            style: {
+                                color: '#3b82f6',
+                                weight: 3,
+                                opacity: 0.8,
+                                fillColor: 'transparent',
+                                fillOpacity: 0
+                            }
+                        }).addTo(map);
+
+                        // Create mask
+                        const outer = [[90, -180], [90, 180], [-90, 180], [-90, -180]];
+                        let coords = geojson.coordinates;
+
+                        if (geojson.type === 'Polygon') {
+                            const inner = coords[0].map(c => [c[1], c[0]]);
+                            L.polygon([outer, inner], {
+                                color: 'transparent',
+                                fillColor: '#0f172a',
+                                fillOpacity: 1,
+                                interactive: false
+                            }).addTo(map);
+                        } else if (geojson.type === 'MultiPolygon') {
+                            coords.forEach(poly => {
+                                const inner = poly[0].map(c => [c[1], c[0]]);
+                                L.polygon([outer, inner], {
+                                    color: 'transparent',
+                                    fillColor: '#0f172a',
+                                    fillOpacity: 1,
+                                    interactive: false
+                                }).addTo(map);
+                            });
+                        }
+                    }
+                })
+                .catch(e => console.log('Alternative source also failed:', e));
+        }
+
+        // Update layer switcher to show dark as selected
+        document.querySelectorAll('.layer-option').forEach(opt => {
+            opt.classList.remove('selected');
+            if (opt.dataset.layer === 'dark') {
+                opt.classList.add('selected');
+            }
+        });
+
+
+        // Markers storage
+        let markers = JSON.parse(localStorage.getItem('kyrgyzstanMarkers')) || [];
+        let mapMarkers = {};
+        let addMarkerMode = false;
+
+        // Category icons
+        const categoryIcons = {
+            place: 'fa-map-pin',
+            nature: 'fa-mountain',
+            food: 'fa-utensils',
+            hotel: 'fa-hotel',
+            attraction: 'fa-star',
+            transport: 'fa-car'
+        };
+
+        const categoryColors = {
+            place: '#3b82f6',
+            nature: '#10b981',
+            food: '#fbbf24',
+            hotel: '#8b5cf6',
+            attraction: '#ec4899',
+            transport: '#6366f1'
+        };
+
+        // Create custom marker icon
+        function createMarkerIcon(category) {
+            const color = categoryColors[category] || categoryColors.place;
+            return L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div style="
+                    width: 36px;
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(135deg, ${color} 0%, ${adjustColor(color, -30)} 100%);
+                    border-radius: 50% 50% 50% 0;
+                    transform: rotate(-45deg);
+                    box-shadow: 0 4px 15px ${color}66;
+                    border: 3px solid white;
+                ">
+                    <i class="fas ${categoryIcons[category] || categoryIcons.place}" style="
+                        transform: rotate(45deg);
+                        color: white;
+                        font-size: 14px;
+                    "></i>
+                </div>`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 36],
+                popupAnchor: [0, -36]
+            });
+        }
+
+        function adjustColor(color, amount) {
+            const hex = color.replace('#', '');
+            const num = parseInt(hex, 16);
+            const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+            const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
+            const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
+            return `#${(b | (g << 8) | (r << 16)).toString(16).padStart(6, '0')}`;
+        }
+
+        // Add marker to map
+        function addMarkerToMap(markerData) {
+            const icon = createMarkerIcon(markerData.category);
+            const marker = L.marker([markerData.lat, markerData.lng], { icon })
+                .addTo(map)
+                .bindPopup(`
+                    <div class="popup-content">
+                        <h4>${markerData.name}</h4>
+                        ${markerData.description ? `<p>${markerData.description}</p>` : ''}
+                        <div class="coords">
+                            <i class="fas fa-map-marker-alt"></i> 
+                            ${markerData.lat.toFixed(5)}, ${markerData.lng.toFixed(5)}
+                        </div>
+                    </div>
+                `);
+            mapMarkers[markerData.id] = marker;
+        }
+
+        // Render markers list
+        function renderMarkersList() {
+            const list = document.getElementById('markersList');
+            const count = document.getElementById('markerCount');
+            count.textContent = markers.length;
+
+            if (markers.length === 0) {
+                list.innerHTML = `
+                    <div class="no-markers">
+                        <i class="fas fa-map-pin"></i>
+                        <p>Нет сохранённых меток</p>
+                        <p>Кликните на карту, чтобы добавить</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = markers.map(m => `
+                <div class="marker-item" data-id="${m.id}">
+                    <h4><i class="fas ${categoryIcons[m.category] || categoryIcons.place}"></i> ${m.name}</h4>
+                    <p>${m.description || 'Без описания'}</p>
+                    <div class="marker-item-actions">
+                        <button class="marker-btn goto" onclick="goToMarker('${m.id}')">
+                            <i class="fas fa-location-arrow"></i>
+                        </button>
+                        <button class="marker-btn edit" onclick="editMarker('${m.id}')">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="marker-btn delete" onclick="deleteMarker('${m.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Save markers to localStorage
+        function saveMarkers() {
+            localStorage.setItem('kyrgyzstanMarkers', JSON.stringify(markers));
+        }
+
+        // Load existing markers
+        function loadMarkers() {
+            markers.forEach(m => addMarkerToMap(m));
+            renderMarkersList();
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                info: 'fa-info-circle'
+            };
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<i class="fas ${icons[type]}"></i> ${message}`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Modal functions
+        function openModal(title, data = null) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalOverlay').classList.add('active');
+            if (data) {
+                document.getElementById('markerId').value = data.id || '';
+                document.getElementById('markerLat').value = data.lat || '';
+                document.getElementById('markerLng').value = data.lng || '';
+                document.getElementById('markerName').value = data.name || '';
+                document.getElementById('markerDesc').value = data.description || '';
+                document.getElementById('markerCategory').value = data.category || 'place';
+            } else {
+                document.getElementById('markerForm').reset();
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.getElementById('markerForm').reset();
+        }
+
+        // Go to marker
+        function goToMarker(id) {
+            const marker = markers.find(m => m.id === id);
+            if (marker) {
+                map.flyTo([marker.lat, marker.lng], 14);
+                mapMarkers[id].openPopup();
+            }
+        }
+
+        // Edit marker
+        function editMarker(id) {
+            const marker = markers.find(m => m.id === id);
+            if (marker) {
+                openModal('Редактировать метку', marker);
+            }
+        }
+
+        // Delete marker
+        function deleteMarker(id) {
+            if (confirm('Удалить эту метку?')) {
+                markers = markers.filter(m => m.id !== id);
+                if (mapMarkers[id]) {
+                    map.removeLayer(mapMarkers[id]);
+                    delete mapMarkers[id];
+                }
+                saveMarkers();
+                renderMarkersList();
+                showToast('Метка удалена', 'success');
+            }
+        }
+
+        // Search functionality
+        let searchTimeout;
+        document.getElementById('searchInput').addEventListener('input', function (e) {
+            const query = e.target.value.trim();
+            const clearBtn = document.getElementById('clearSearch');
+            const resultsDiv = document.getElementById('searchResults');
+
+            clearBtn.style.display = query ? 'block' : 'none';
+
+            if (query.length < 2) {
+                resultsDiv.classList.remove('active');
+                return;
+            }
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kg&limit=5`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.length === 0) {
+                            resultsDiv.innerHTML = '<div class="search-result-item"><p>Ничего не найдено</p></div>';
+                        } else {
+                            resultsDiv.innerHTML = data.map(item => `
+                                <div class="search-result-item" data-lat="${item.lat}" data-lng="${item.lon}">
+                                    <h4>${item.display_name.split(',')[0]}</h4>
+                                    <p>${item.display_name.split(',').slice(1, 3).join(',')}</p>
+                                </div>
+                            `).join('');
+                        }
+                        resultsDiv.classList.add('active');
+                    })
+                    .catch(() => {
+                        resultsDiv.innerHTML = '<div class="search-result-item"><p>Ошибка поиска</p></div>';
+                        resultsDiv.classList.add('active');
+                    });
+            }, 500);
+        });
+
+        document.getElementById('clearSearch').addEventListener('click', function () {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').classList.remove('active');
+            this.style.display = 'none';
+        });
+
+        document.getElementById('searchResults').addEventListener('click', function (e) {
+            const item = e.target.closest('.search-result-item');
+            if (item && item.dataset.lat) {
+                map.flyTo([parseFloat(item.dataset.lat), parseFloat(item.dataset.lng)], 14);
+                document.getElementById('searchResults').classList.remove('active');
+                document.getElementById('searchInput').value = item.querySelector('h4').textContent;
+            }
+        });
+
+        // Map click handler
+        map.on('click', function (e) {
+            if (addMarkerMode) {
+                openModal('Добавить метку', {
+                    lat: e.latlng.lat,
+                    lng: e.latlng.lng
+                });
+            }
+        });
+
+        // Form submit
+        document.getElementById('markerForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const id = document.getElementById('markerId').value;
+            const markerData = {
+                id: id || Date.now().toString(),
+                lat: parseFloat(document.getElementById('markerLat').value),
+                lng: parseFloat(document.getElementById('markerLng').value),
+                name: document.getElementById('markerName').value,
+                description: document.getElementById('markerDesc').value,
+                category: document.getElementById('markerCategory').value
+            };
+
+            if (id) {
+                // Edit existing
+                const index = markers.findIndex(m => m.id === id);
+                if (index !== -1) {
+                    markers[index] = markerData;
+                    map.removeLayer(mapMarkers[id]);
+                    addMarkerToMap(markerData);
+                    showToast('Метка обновлена', 'success');
+                }
+            } else {
+                // Add new
+                markers.push(markerData);
+                addMarkerToMap(markerData);
+                showToast('Метка добавлена', 'success');
+            }
+
+            saveMarkers();
+            renderMarkersList();
+            closeModal();
+        });
+
+        // Cancel button
+        document.getElementById('cancelBtn').addEventListener('click', closeModal);
+
+        // Close modal on overlay click
+        document.getElementById('modalOverlay').addEventListener('click', function (e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Add marker mode toggle
+        document.getElementById('addMarkerMode').addEventListener('click', function () {
+            addMarkerMode = !addMarkerMode;
+            this.classList.toggle('active', addMarkerMode);
+            document.getElementById('instructions').style.display = addMarkerMode ? 'none' : 'flex';
+            map.getContainer().style.cursor = addMarkerMode ? 'crosshair' : '';
+            showToast(addMarkerMode ? 'Режим добавления включён' : 'Режим добавления выключен', 'info');
+        });
+
+        // Locate user
+        document.getElementById('locateBtn').addEventListener('click', function () {
+            map.locate({ setView: true, maxZoom: 14 });
+        });
+
+        map.on('locationfound', function (e) {
+            L.marker(e.latlng).addTo(map)
+                .bindPopup('Вы здесь')
+                .openPopup();
+        });
+
+        map.on('locationerror', function () {
+            showToast('Не удалось определить местоположение', 'error');
+        });
+
+        // Layer switcher
+        document.getElementById('layersBtn').addEventListener('click', function () {
+            document.getElementById('layerSwitcher').classList.toggle('active');
+        });
+
+        document.querySelectorAll('.layer-option').forEach(option => {
+            option.addEventListener('click', function () {
+                const layer = this.dataset.layer;
+                if (layer !== currentLayer) {
+                    map.removeLayer(layers[currentLayer]);
+                    layers[layer].addTo(map);
+                    currentLayer = layer;
+                    document.querySelectorAll('.layer-option').forEach(o => o.classList.remove('selected'));
+                    this.classList.add('selected');
+                }
+                document.getElementById('layerSwitcher').classList.remove('active');
+            });
+        });
+
+        // Download markers
+        document.getElementById('downloadBtn').addEventListener('click', function () {
+            if (markers.length === 0) {
+                showToast('Нет меток для экспорта', 'error');
+                return;
+            }
+            const data = JSON.stringify(markers, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'kyrgyzstan_markers.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Метки экспортированы', 'success');
+        });
+
+        // Toggle sidebar
+        document.getElementById('toggleSidebar').addEventListener('click', function () {
+            document.getElementById('sidebar').classList.remove('collapsed');
+        });
+
+        // Close layer switcher when clicking outside
+        document.addEventListener('click', function (e) {
+            const layerSwitcher = document.getElementById('layerSwitcher');
+            const layersBtn = document.getElementById('layersBtn');
+            if (!layerSwitcher.contains(e.target) && !layersBtn.contains(e.target)) {
+                layerSwitcher.classList.remove('active');
+            }
+        });
+
+        // Initialize
+        loadMarkers();
+
+        // ========== HYDROELECTRIC POWER STATIONS (ГЭС) ==========
+        const gesData = [
+            { name: "Чон-Кеминская ГЭС", power: "20", company: "ОсОО «Кемин энерджи»", lat: 42.7295, lng: 76.08761, year: "" },
+            { name: "Ала-Арчинская ГЭС", power: "4", company: "ОсОО «Капчыгай Энерджи»", lat: 42.68302, lng: 74.52175, year: "" },
+            { name: "Зардалы МГЭС", power: "29", company: "ОсОО «Ак-Буура Групп»", lat: 39.65189, lng: 70.9417, year: "" },
+            { name: "МГЭС Кобук", power: "5", company: "ОсОО «Кобук-19»", lat: 41.9477, lng: 74.14059, year: "" },
+            { name: "МГЭС Данги", power: "20", company: "АООТ «Сателлит-2005»", lat: 39.9532, lng: 72.94911, year: "" },
+            { name: "МГЭС Кыргыз-Ата 2", power: "3", company: "АООТ «Сателлит-2005»", lat: 40.20371, lng: 72.67646, year: "" },
+            { name: "МГЭС «Жиптик»", power: "2", company: "АООТ «Сателлит-2005»", lat: 40.4155839, lng: 72.8716066, year: "2021" },
+            { name: "Колтор", power: "2", company: "ОсОО «Агро Микс»", lat: 42.68983, lng: 75.16206, year: "" },
+            { name: "Каскад МГЭС на реке Ак-Суу", power: "10.3", company: "ОФ «Энергоальтернатива»", lat: 42.8565, lng: 74.0918, year: "" },
+            { name: "Ак-Терекская МГЭС", power: "2.8", company: "ОсОО «Ак-Терекская ГЭС»", lat: 42.24056, lng: 77.76477, year: "" },
+            { name: "Тонская ГЭС", power: "3.7", company: "ОсОО «Тонские ГЭС»", lat: 42.70971, lng: 76.00558, year: "" },
+            { name: "Бала-Саруу ГЭС", power: "25", company: "ОАО «Чакан ГЭС»", lat: 42.6682456, lng: 71.5980628, year: "" },
+            { name: "Лейлек", power: "6", company: "ОсОО «Кыргыз Каганат»", lat: 39.82614, lng: 70.04173, year: "" },
+            { name: "Итагар", power: "21", company: "ОсОО «Кыргыз Каганат»", lat: 41.63314, lng: 71.86892, year: "" },
+            { name: "Сокулукская ГЭС-2", power: "2.4", company: "ОсОО Impex Trade", lat: 42.7454, lng: 74.212, year: "2021" },
+            { name: "Курманбек Ата", power: "4", company: "ИП Джумагулова К.", lat: 42.836698, lng: 73.698207, year: "" },
+            { name: "Каракол", power: "3", company: "ОсОО «Комплексстрой»", lat: 42.44098, lng: 78.41449, year: "" },
+            { name: "Сандык-1", power: "20", company: "ОсОО ПП «Нарын»", lat: 42.10985, lng: 74.09616, year: "" },
+            { name: "Сандык-2", power: "20", company: "ОсОО ПП «Нарын»", lat: 42.09926, lng: 74.11416, year: "" },
+            { name: "Сандык-3", power: "20", company: "ОсОО ПП «Нарын»", lat: 42.09644, lng: 74.11808, year: "" },
+            { name: "Шамшы Булак", power: "2", company: "ОсОО «Шамшы Булак»", lat: 42.68977, lng: 75.36229, year: "" },
+            { name: "Шамшы Агро", power: "3", company: "ОсОО «Шамшы Агро»", lat: 42.67896, lng: 75.36977, year: "" },
+            { name: "Манас Энерджи", power: "2.7", company: "ОсОО «Манас Энерджи»", lat: 42.6011, lng: 79.03298, year: "" },
+            { name: "Найман", power: "2", company: "ОсОО «Кыргыз Энерго Сеть»", lat: 40.33179, lng: 72.36419, year: "" },
+            { name: "Шамши", power: "1.5", company: "ОсОО «Нур Ал Энерго»", lat: 42.31504, lng: 75.43196, year: "" },
+            { name: "Боомская ГЭС", power: "22", company: "ОсОО «Кемин Гидро»", lat: 42.46243, lng: 75.90847, year: "" },
+            { name: "Кара-Булакская ГЭС", power: "4", company: "ОсОО «Кемин Турбина»", lat: 42.70597, lng: 76.03123, year: "" },
+            { name: "Соок-1", power: "3", company: "ОсОО «Эко Энерго Сервис»", lat: 42.197336, lng: 75.168065, year: "" },
+            { name: "Соок-2", power: "3", company: "ОсОО «Эко Энерго Сервис»", lat: 42.205674, lng: 75.122866, year: "" },
+            { name: "Каракол-2", power: "3", company: "ОсОО «Альп Строй Групп»", lat: 42.386417, lng: 79.442884, year: "" },
+            { name: "Чон-Кемин-4", power: "4", company: "ИП Богомбаев Э.С.", lat: 42.743881, lng: 76.125819, year: "" },
+            { name: "Чункурчак", power: "5", company: "ОсОО «DATT Energy»", lat: 42.622311, lng: 74.597917, year: "" },
+            { name: "Кок-Арт-1", power: "3.4", company: "ОсОО «DATT Energy»", lat: 41.076706, lng: 73.068999, year: "" },
+            { name: "Кок-Арт-2", power: "4.1", company: "ОсОО «DATT Energy»", lat: 41.055651, lng: 73.042857, year: "" },
+            { name: "Колдомо", power: "2", company: "ОсОО «DATT Energy»", lat: 41.157159, lng: 73.182959, year: "" },
+            { name: "Кызыл-Суу Сузак", power: "2", company: "ОсОО «DATT Energy»", lat: 41.118035, lng: 73.39336, year: "" },
+            { name: "Жети-Огуз", power: "10", company: "ОсОО «DATT Energy»", lat: 42.491152, lng: 78.101216, year: "" },
+            { name: "Ак-Терек", power: "4", company: "ОсОО «DATT Energy»", lat: 42.162012, lng: 76.663916, year: "" },
+            { name: "Барскоон", power: "7.1", company: "ОсОО «DATT Energy»", lat: 42.047292, lng: 77.597846, year: "" },
+            { name: "Тосор-1", power: "3", company: "ОсОО «DATT Energy»", lat: 42.069555, lng: 77.362101, year: "" },
+            { name: "Тосор-2", power: "3", company: "ОсОО «DATT Energy»", lat: 42.083801, lng: 77.367809, year: "" },
+            { name: "Чон-Жаргылчак-1", power: "5", company: "ОсОО «DATT Energy»", lat: 42.103702, lng: 77.71859, year: "" },
+            { name: "Чон-Жаргылчак-2", power: "2", company: "ОсОО «DATT Energy»", lat: 42.111239, lng: 77.715148, year: "" },
+            { name: "Кичи-Жаргылчак-1", power: "4", company: "ОсОО «DATT Energy»", lat: 42.161771, lng: 77.76934, year: "" },
+            { name: "Кичи-Жаргылчак-2", power: "1.5", company: "ОсОО «DATT Energy»", lat: 42.16551, lng: 77.762777, year: "" },
+            { name: "Мин-Куш", power: "2.8", company: "ОсОО «DATT Energy»", lat: 41.675558, lng: 74.459563, year: "" },
+            { name: "Дунгуромо", power: "1.5", company: "ОсОО «DATT Energy»", lat: 41.709502, lng: 74.305634, year: "" },
+            { name: "Босого", power: "9", company: "ОсОО «DATT Energy»", lat: 41.331542, lng: 75.680175, year: "" },
+            { name: "Баш-Каинды", power: "0.55", company: "ОсОО «DATT Energy»", lat: 41.16473, lng: 75.89997, year: "" },
+            { name: "Каскад на реке Ысык-Ата", power: "25.6", company: "ОсОО «Керамика»", lat: 42.819387, lng: 74.927334, year: "" },
+            { name: "Каскад на реке Аламедин", power: "4.7", company: "ОсОО «Керамика»", lat: 42.550724, lng: 74.662101, year: "" },
+            { name: "Каскад на реке Ак-Суу", power: "9.2", company: "ОсОО «Керамика»", lat: 42.857352, lng: 74.091916, year: "" },
+            { name: "Каскад на реке Турген-Ак-Суу", power: "31.6", company: "ОсОО «Керамика»", lat: 42.37144, lng: 78.613753, year: "" },
+            { name: "Каскад на реке Жеты-Огуз", power: "6.2", company: "ОсОО «Керамика»", lat: 42.493048, lng: 78.097634, year: "" },
+            { name: "Каскад на реке Ак-Терек", power: "7.4", company: "ОсОО «Керамика»", lat: 42.175885, lng: 76.66933, year: "" },
+            { name: "Каскад на реке Сокулук", power: "7.2", company: "ОсОО «Керамика»", lat: 43.071395, lng: 74.145246, year: "" },
+            { name: "Каинды", power: "2", company: "ОсОО «Эко Ресурс ЛТД»", lat: 42.695689, lng: 73.650369, year: "" },
+            { name: "Каскад Шамсинская ГЭС", power: "10", company: "ОсОО «ЧУЙ Гидро»", lat: 42.69613, lng: 75.355569, year: "" },
+            { name: "Каскад на реке Турген", power: "15", company: "ОсОО «Чон Ак Суу Гидро Энерго»", lat: 42.600054, lng: 78.724882, year: "" },
+            { name: "Каскад на реке Чон Ак Суу", power: "21", company: "ОсОО «Чон Ак Суу Гидро Энерго»", lat: 42.732433, lng: 77.474554, year: "" },
+            { name: "Чон Аксуу", power: "11", company: "ОсОО «Оптимус Плюс»", lat: 42.728887, lng: 77.475046, year: "" },
+            { name: "Суусамырская-2", power: "8", company: "ОсОО «Юридическая компания Оптимус»", lat: 42.377244, lng: 73.823934, year: "" },
+            { name: "Тар", power: "6", company: "ОсОО «Азия сурьма»", lat: 40.438425, lng: 74.066406, year: "" },
+            { name: "Ала-Арча", power: "1.9", company: "ОсОО «ПриТок»", lat: 42.590962, lng: 74.482309, year: "" },
+            { name: "Аламедин-2", power: "1.2", company: "ОсОО «ПриТок»", lat: 42.60679, lng: 74.661168, year: "" },
+            { name: "Жыргалан", power: "1.5", company: "ОсОО «Жыргалан ГЭС»", lat: 42.651642, lng: 78.870791, year: "" },
+            { name: "Торпу", power: "1.4", company: "ССКК «Нур Кайнар»", lat: 42.782375, lng: 78.569087, year: "" },
+            { name: "Кичи-Аксуу-1", power: "1.4", company: "СК «Сут Азык»", lat: 42.736522, lng: 77.537648, year: "" },
+            { name: "Кичи-Аксуу-2", power: "1.4", company: "СК «Сут Азык»", lat: 42.724338, lng: 77.541524, year: "" },
+            { name: "Каракольская ГЭС-1", power: "1.2", company: "ОсОО «Каракол-Гидро»", lat: 42.406146, lng: 78.44881, year: "" },
+            { name: "Булолуу", power: "2", company: "ОсОО «ДАН Энерджи»", lat: 40.185557, lng: 73.621667, year: "" },
+            { name: "Кара-Ункур", power: "2", company: "ОсОО «Кара-Ункур ток»", lat: 41.38832, lng: 73.063897, year: "" },
+            { name: "Жаз-Кечуу", power: "2", company: "ОсОО «Кара-Ункур ток»", lat: 41.377176, lng: 73.067544, year: "" },
+            { name: "Чон-Кемин-3", power: "2.5", company: "ИП Богомбаев Э.С.", lat: 42.738852, lng: 76.11335, year: "" },
+            { name: "Чуйская", power: "12", company: "ОсОО «Альп Строй Групп»", lat: 42.798264, lng: 75.691856, year: "" },
+            { name: "Алабуга", power: "15", company: "ОсОО «Альп Строй Групп»", lat: 41.347401, lng: 74.715488, year: "" },
+            { name: "Балгарт", power: "4", company: "ОсОО «Эко Энерго Сервис»", lat: 41.725831, lng: 76.836805, year: "" },
+            { name: "Каракол-3", power: "3", company: "ОсОО «Эко Энерго Сервис»", lat: 42.451272, lng: 78.403803, year: "" },
+            { name: "Барскоон-2", power: "3", company: "ОсОО «Эко Энерго Сервис»", lat: 42.131997, lng: 77.592987, year: "" },
+            { name: "Кызыл-Суу", power: "2", company: "ОсОО «АльтЭнерго и Ко»", lat: 40.612754, lng: 73.118618, year: "" },
+            { name: "Каскад МГЭС Ак-Суу", power: "6.6", company: "ИП Зарлык уулу Нурбек", lat: 42.853818, lng: 74.091878, year: "" },
+            { name: "Кокомерен", power: "17.2", company: "ОсОО «Номад Майнинг»", lat: 42.194376, lng: 73.562324, year: "" },
+            { name: "Мин Темир", power: "5", company: "ОсОО «Мин-Темир»", lat: 42.445059, lng: 78.40964, year: "" },
+            { name: "Каскад Аламединских МГЭС", power: "15", company: "ОсОО «ЛЭП Строй»", lat: 42.607202, lng: 74.661296, year: "" },
+            { name: "Каскад Токмакских МГЭС", power: "50", company: "ОсОО «ЛЭП Строй»", lat: 42.808485, lng: 75.274722, year: "" },
+            { name: "Ала-Арча-2", power: "0.04", company: "ОсОО «Электрощит»", lat: 42.798402, lng: 74.586808, year: "" },
+            { name: "Арашан", power: "1.6", company: "СК «Сары Кол-Келечек»", lat: 42.474639, lng: 78.531727, year: "" },
+            { name: "Каракол-4", power: "3.6", company: "СК «Сары Кол-Келечек»", lat: 42.416475, lng: 78.442161, year: "" },
+            { name: "Кутургу", power: "2.3", company: "СК «Сары Кол-Келечек»", lat: 42.747861, lng: 78.115559, year: "" },
+            { name: "Жергез", power: "4.1", company: "СК «Сары Кол-Келечек»", lat: 42.537543, lng: 78.682274, year: "" },
+            { name: "Ак-Терек-2", power: "2.8", company: "ОсОО «Сарыжаз Ремстрой»", lat: 42.159821, lng: 76.661965, year: "" },
+            { name: "Чон-Аксуу-2", power: "11", company: "ОсОО «Сарыжаз Ремстрой»", lat: 42.715322, lng: 77.471855, year: "" },
+            { name: "Геотермальная Энильчек", power: "300", company: "ОсОО «Сарыжаз Ремстрой»", lat: 42.029529, lng: 79.081215, year: "" },
+            { name: "Ленинполь", power: "2.3", company: "ОсОО «Бакай-Ата Минералз»", lat: 42.531752, lng: 72.115174, year: "" },
+            { name: "Джарды-Каинда", power: "8.9", company: "ОО «Белен-Теке ТОР»", lat: 42.8503, lng: 73.679766, year: "" },
+            { name: "Каскад МГЭС Эркин-Сай", power: "4", company: "ОО «Белен-Теке ТОР»", lat: 42.837618, lng: 73.791533, year: "" },
+            { name: "Каскад Суусамырская", power: "17", company: "ОО «Белен-Теке ТОР»", lat: 42.13534, lng: 74.058618, year: "" },
+            { name: "Жума", power: "0.2", company: "Сооронкулов Т.С.", lat: 42.527516, lng: 72.063559, year: "" },
+            { name: "Алайская", power: "30", company: "ОсОО «Энергостроймонтаж»", lat: 39.637467, lng: 72.671825, year: "" },
+            { name: "Жарды-Каинды", power: "5", company: "ОсОО «DATT Energy»", lat: 42.836187, lng: 73.698623, year: "" },
+            { name: "Боз-Учук", power: "0.7", company: "ОсОО «Комплексстрой»", lat: 42.570074, lng: 78.775676, year: "" },
+            { name: "Джети-Огузская ГЭС-1", power: "1", company: "Дубанаев А.С.", lat: 42.415757, lng: 78.214551, year: "" },
+            { name: "Аманат", power: "4.5", company: "ОсОО «Аманат-Энерго»", lat: 42.65638, lng: 74.74446, year: "" },
+            { name: "Нарзан", power: "10", company: "ОсОО «Чуй Энерго»", lat: 42.840465, lng: 74.085799, year: "" },
+            { name: "Ала-Тоо ГЭС", power: "1", company: "ОсОО «Ала-Тоо Энергохолдинг»", lat: 42.313954, lng: 76.393949, year: "" },
+            { name: "Жаны-Жол", power: "12", company: "ОсОО «ДН Энерджи Групп»", lat: 41.673509, lng: 72.046115, year: "" },
+            { name: "Кондук", power: "5.13", company: "ОсОО «Интегра Энерджи»", lat: 40.461704, lng: 74.13057, year: "" },
+            { name: "Ысык-Ата", power: "4", company: "ОсОО «Сапат-Электро.КТ»", lat: 42.810344, lng: 74.925769, year: "" },
+            { name: "Кара-Суу", power: "20", company: "ОсОО «Сапат-Электро.КТ»", lat: 41.583676, lng: 72.12563, year: "" },
+            { name: "ENERCOM", power: "10", company: "ОсОО «ENERCOM»", lat: 40.431109, lng: 74.105736, year: "" },
+            { name: "Энергия", power: "5", company: "ОсОО «ДОМиК»", lat: 42.740145, lng: 78.018194, year: "" },
+            { name: "Кара-суу электро", power: "1", company: "ОсОО «Карасуу электро»", lat: 41.765372, lng: 73.194807, year: "" },
+            { name: "Кара-Жыгач", power: "1", company: "ОсОО «Бризз»", lat: 41.769323, lng: 73.293541, year: "" },
+            { name: "Сары-Таш", power: "1", company: "ОсОО «Бризз»", lat: 41.769323, lng: 73.293541, year: "" },
+            { name: "Чагыр-Ата", power: "2.5", company: "ОсОО «Чагыр Ата»", lat: 42.129912, lng: 77.593244, year: "" },
+            { name: "Тукай-Ата", power: "1.5", company: "ОсОО «Чагыр Ата»", lat: 42.145491, lng: 77.537169, year: "" },
+            { name: "Сабыр-Ата", power: "1", company: "ОсОО «Чагыр Ата»", lat: 42.159198, lng: 77.400034, year: "" },
+            { name: "АК Тюз", power: "3", company: "ОсОО «ДИМЕД»", lat: 42.820793, lng: 76.020704, year: "" },
+            { name: "Жолборсту", power: "2.4", company: "ОсОО «Электро Строй Групп»", lat: 40.304476, lng: 73.455008, year: "" },
+            { name: "Папанская МГЭС", power: "20", company: "ОАО «Чакан ГЭС»", lat: 40.379854, lng: 72.886115, year: "" },
+            { name: "Орто-Токой МГЭС", power: "21", company: "ОАО «Чакан ГЭС»", lat: 42.334217, lng: 75.999547, year: "" },
+            { name: "Каракульская МГЭС", power: "18", company: "ОсОО «Жагалмай»", lat: 41.623907, lng: 72.63276, year: "2025" },
+            { name: "Найман ГЭС", power: "н/д", company: "ОАО «Найман ГЭС»", lat: 40.229517, lng: 72.532152, year: "" },
+            { name: "Сокулукская ГЭС", power: "3.5", company: "ОсОО «Импекс трейд»", lat: 42.7308719, lng: 74.2302194, year: "" },
+            { name: "Калининская ГЭС", power: "1.4", company: "ОсОО «Калининская ГЭС»", lat: 42.654017, lng: 73.897856, year: "" },
+            { name: "АРК МГЭС", power: "1.6", company: "ОсОО «Строительная фирма АРК»", lat: 42.68817, lng: 75.052727, year: "" },
+            { name: "МГЭС «Кыргыз-Ата»", power: "0.8", company: "АООТ «Сателит -2005»", lat: 40.1979064, lng: 72.6762928, year: "2021" },
+            { name: "Тегирментинские ГЭС", power: "6.1", company: "ОАО «Тегирментинские ГЭС»", lat: 42.785729, lng: 76.166289, year: "" },
+            { name: "Конур-Олонская ГЭС", power: "3.6", company: "ОсОО «Конур-Олонская ГЭС»", lat: 42.065, lng: 76.5898, year: "" },
+            { name: "Кок-Сайская ГЭС", power: "3.4", company: "ОсОО «Кок-Сайская ГЭС»", lat: 42.061052, lng: 76.788269, year: "" },
+            { name: "ГЭС-1", power: "2.2", company: "ОАО «Чакан ГЭС»", lat: 42.89657, lng: 74.63767, year: "" },
+            { name: "ГЭС-2", power: "2.5", company: "ОАО «Чакан ГЭС»", lat: 42.904457, lng: 74.640966, year: "" },
+            { name: "ГЭС-3", power: "2.1", company: "ОАО «Чакан ГЭС»", lat: 42.915533, lng: 74.644767, year: "" },
+            { name: "ГЭС-4", power: "2.1", company: "ОАО «Чакан ГЭС»", lat: 42.920503, lng: 74.654357, year: "" },
+            { name: "ГЭС-5", power: "6.4", company: "ОАО «Чакан ГЭС»", lat: 42.93801, lng: 74.701587, year: "" },
+            { name: "ГЭС-6", power: "6.4", company: "ОАО «Чакан ГЭС»", lat: 42.962948, lng: 74.713033, year: "" },
+            { name: "Малая ГЭС", power: "0.4", company: "ОАО «Чакан ГЭС»", lat: 42.995269, lng: 74.688299, year: "" },
+            { name: "Лебединовская ГЭС", power: "7.6", company: "ОАО «Чакан ГЭС»", lat: 42.875803, lng: 74.697447, year: "" },
+            { name: "Быстровская ГЭС", power: "8.7", company: "ОАО «Чакан ГЭС»", lat: 42.781735, lng: 75.748816, year: "" },
+            { name: "МГЭС Тон", power: "3.6", company: "ОсОО «Тонский ГЭС»", lat: 42.0238426, lng: 77.0607291, year: "2022" }
+        ];
+
+        // Create GES marker icon (yellow/energy themed)
+        function createGesIcon() {
+            return L.divIcon({
+                className: 'ges-marker',
+                html: `<div style="
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+                    border-radius: 50%;
+                    box-shadow: 0 3px 12px rgba(251, 191, 36, 0.5);
+                    border: 2px solid white;
+                ">
+                    <i class="fas fa-bolt" style="color: #1e293b; font-size: 14px;"></i>
+                </div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16],
+                popupAnchor: [0, -16]
+            });
+        }
+
+        // Add all GES markers to map
+        const gesIcon = createGesIcon();
+        gesData.forEach(ges => {
+            if (ges.lat && ges.lng) {
+                L.marker([ges.lat, ges.lng], { icon: gesIcon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div class="popup-content">
+                            <h4>⚡ ${ges.name}</h4>
+                            <p><strong>Мощность:</strong> ${ges.power} МВт</p>
+                            <p><strong>Компания:</strong> ${ges.company}</p>
+                            ${ges.year ? `<p><strong>Год:</strong> ${ges.year}</p>` : ''}
+                            <div class="coords">
+                                <i class="fas fa-map-marker-alt"></i> 
+                                ${ges.lat.toFixed(5)}, ${ges.lng.toFixed(5)}
+                            </div>
+                        </div>
+                    `);
+            }
+        });
+
+        showToast(`Загружено ${gesData.length} ГЭС`, 'success');
+    </script>
+</body>
+
+</html>
